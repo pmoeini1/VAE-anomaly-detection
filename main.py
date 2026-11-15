@@ -2,7 +2,6 @@ from datasets import load_dataset
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
-
 # import 1 building's hourly electricity consumption
 ds = load_dataset("LeoTungAnh/electricity_hourly", split="train", streaming=True)
 row = next(iter(ds))
