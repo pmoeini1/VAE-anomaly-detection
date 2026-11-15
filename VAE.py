@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 # encoder makes 48-hr window into a distribution in 8-dim latent space
 # decoder reconstructs from 8-dim latent space
