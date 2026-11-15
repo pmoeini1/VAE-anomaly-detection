@@ -64,7 +64,7 @@ def main():
         model.eval()
         with torch.no_grad():
             val_loss = neg_elbo(X_val, *model(X_val)).item()
-        print(f"epoch {epoch+1:02d}  train {train_loss.item():.2f}  val {val_loss:.2f}")
+        print(f"epoch {epoch+1:02d}  train {train_loss:.2f}  val {val_loss:.2f}")
 
     removed = torch.from_numpy(np.ascontiguousarray(training_windows[outlier_window], dtype=np.float32))
     clean = anomaly_score(model, X_val)
