@@ -6,9 +6,10 @@ from VAE import VAE
 from loss_functions import neg_elbo
 import torch
 from anomaly_score import anomaly_score
-import matplotlib.pyplot as plt
+from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
 
 def main():
+    np.random.seed(42)
     # import 1 client's hourly electricity consumption
     ds = load_dataset("LeoTungAnh/electricity_hourly", split="train", streaming=True)
     row = next(iter(ds))
@@ -33,6 +34,12 @@ def main():
     training_windows = sliding_window_view(train_raw, WINDOW)
     outlier_window = sliding_window_view(outlier, WINDOW).any(axis=1)
     x_train = training_windows[~outlier_window]
+
+    test_slots = (np.arange(len(test_raw)) + split) % PERIOD
+    test_residuals = test_raw - profile[test_slots]
+    test_outliers = (test_residuals < q1 - 1.5*iqr) | (test_residuals > q3 + 1.5*iqr)
+    test_windows = sliding_window_view(test_raw, WINDOW)
+    y_test = sliding_window_view(test_outliers, WINDOW).any(axis=1)
 
     # split into training and validation sets
     X = torch.from_numpy(np.ascontiguousarray(x_train, dtype=np.float32))
@@ -66,27 +73,27 @@ def main():
             val_loss = neg_elbo(X_val, *model(X_val)).item()
         print(f"epoch {epoch+1:02d}  train {train_loss:.2f}  val {val_loss:.2f}")
 
+    # sanity check that outliers have higher anomaly scores than non-outliers
     removed = torch.from_numpy(np.ascontiguousarray(training_windows[outlier_window], dtype=np.float32))
     clean = anomaly_score(model, X_val)
     removed = anomaly_score(model, removed)
     print("Clean val mean score: ", clean.mean().item())
     print("Removed window mean score: ", removed.mean().item())
 
-    clean = clean.numpy()
-    removed = removed.numpy()
-    fig, ax = plt.subplots(figsize=(8,4))
-    bins = np.linspace(min(clean.min(), removed.min()), max(clean.max(), removed.max()), 80)
+    # get scores for test windows
+    X_test = torch.from_numpy(np.ascontiguousarray(test_windows, dtype=np.float32))
+    test_scores = anomaly_score(model, X_test).numpy()
 
-    ax.hist(clean, bins=bins, alpha=0.6, label="Clean Validation")
-    ax.hist(removed, bins=bins, alpha=0.6, label="Removed (Outlier) Windows")
-    ax.set_xscale("symlog")
-    ax.set_yscale("log")
-    ax.set_xlabel("Anomaly score (negative log-likelihood)")
-    ax.set_ylabel("Number of windows")
-    ax.legend()
-    plt.show()
+    if y_test.sum()==0: 
+        print("no anomalous test windows, skipping metrics")
+        return
 
-
+    # investigate test scores w/ anomaly score greater than 99th percentile
+    val_scores = clean.numpy()
+    thr = np.percentile(val_scores, 99)
+    preds = test_scores > thr
+    p, r, f1, _ = precision_recall_fscore_support(y_test, preds, average="binary", zero_division=0)
+    print(f"threshold {thr:.2f}  precision {p:.3f}  recall {r:.3f}  F1 {f1:.3f}")
 
 if __name__=="__main__":
     main()
