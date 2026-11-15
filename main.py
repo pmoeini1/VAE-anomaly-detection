@@ -6,6 +6,7 @@ from VAE import VAE
 from loss_functions import neg_elbo
 import torch
 from anomaly_score import anomaly_score
+import matplotlib.pyplot as plt
 
 def main():
     # import 1 client's hourly electricity consumption
@@ -36,7 +37,7 @@ def main():
     # split into training and validation sets
     X = torch.from_numpy(np.ascontiguousarray(x_train, dtype=np.float32))
     n_val = int(0.1*len(X))
-    X_tr, X_val = X[: len(X) - n_val - WINDOW], X[len(X) - n_val:]
+    X_tr, X_val = X[:len(X) - n_val - WINDOW], X[len(X) - n_val:]
 
     loader = DataLoader(TensorDataset(X_tr), batch_size=256, shuffle=True)
     model = VAE(window=WINDOW)
@@ -45,6 +46,7 @@ def main():
     # training
     for epoch in range(30):
         model.train()
+        total, n = 0.0, 0
         # go over each minibatch
         for (xb,) in loader:
             # clear out old gradients
@@ -55,15 +57,36 @@ def main():
             loss.backward()
             opt.step()
 
+            total += loss.item() * len(xb)
+            n += len(xb)
+        train_loss = total / n
+
         model.eval()
         with torch.no_grad():
             val_loss = neg_elbo(X_val, *model(X_val)).item()
-        print(f"epoch {epoch+1:02d}  train {loss.item():.2f}  val {val_loss:.2f}")
-
+        print(f"epoch {epoch+1:02d}  train {train_loss.item():.2f}  val {val_loss:.2f}")
 
     removed = torch.from_numpy(np.ascontiguousarray(training_windows[outlier_window], dtype=np.float32))
-    print("Clean val mean score: ", anomaly_score(model, X_val).mean().item())
-    print("Removed window mean score: ", anomaly_score(model, removed).mean().item())
+    clean = anomaly_score(model, X_val)
+    removed = anomaly_score(model, removed)
+    print("Clean val mean score: ", clean.mean().item())
+    print("Removed window mean score: ", removed.mean().item())
+
+    clean = clean.numpy()
+    removed = removed.numpy()
+    fig, ax = plt.subplots(figsize=(8,4))
+    bins = np.linspace(min(clean.min(), removed.min()), max(clean.max(), removed.max()), 80)
+
+    ax.hist(clean, bins=bins, alpha=0.6, label="Clean Validation")
+    ax.hist(removed, bins=bins, alpha=0.6, label="Removed (Outlier) Windows")
+    ax.set_xscale("symlog")
+    ax.set_yscale("log")
+    ax.set_xlabel("Anomaly score (negative log-likelihood)")
+    ax.set_ylabel("Number of windows")
+    ax.legend()
+    plt.show()
+
+
 
 if __name__=="__main__":
     main()
