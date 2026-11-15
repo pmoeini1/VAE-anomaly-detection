@@ -6,10 +6,10 @@ from VAE import VAE
 from loss_functions import neg_elbo
 import torch
 from anomaly_score import anomaly_score
-from sklearn.metrics import roc_auc_score, precision_recall_fscore_support
+from sklearn.metrics import precision_recall_fscore_support
 
 def main():
-    np.random.seed(42)
+    torch.manual_seed(42)
     # import 1 client's hourly electricity consumption
     ds = load_dataset("LeoTungAnh/electricity_hourly", split="train", streaming=True)
     row = next(iter(ds))
