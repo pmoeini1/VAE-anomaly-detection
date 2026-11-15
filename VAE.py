@@ -46,6 +46,3 @@ class VAE(nn.Module):
         z = self.reparameterize(mu, logvar)
         x_mu, x_logvar = self.decode(z)
         return x_mu, x_logvar, mu, logvar
-
-
-    
