@@ -10,3 +10,8 @@ An anomaly detector for a time series, built with a variational autoencoder (VAE
 4. **Model:** an MLP VAE. The encoder maps a 48-hour window to an 8-dimensional latent distribution, and the decoder predicts a mean and variance for every hour.
 5. **Scoring:** the anomaly score is the negative log-likelihood of a window under the decoder, averaged over 20 latent samples (reconstruction probability). Higher means more anomalous.
 6. **Evaluation:** test windows are labeled with the same weekly-residual IQR rule, using statistics computed on the training data only. The detection threshold is the 99th percentile of clean validation scores, never tuned on the test set.
+
+99th percentile threshold: 23.44
+Precision: 0.865
+Recall: 0.817
+F1: 0.840
